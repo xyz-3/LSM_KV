@@ -157,30 +157,30 @@ void usage(const char *prog, const char *verb, const char *mode)
 }
 
 
-//int main(int argc, char *argv[])
-//{
-//	bool verbose = false;
-//	bool testmode = false;
-//
-//	if (argc == 2) {
-//		verbose = std::string(argv[1]) == "-v";
-//		testmode = std::string(argv[1]) == "-t";
-//	} else if (argc == 3) {
-//		verbose = std::string(argv[1]) == "-v" ||
-//			std::string(argv[2]) == "-v";
-//		testmode = std::string(argv[1]) == "-t" ||
-//			std::string(argv[2]) == "-t";
-//	} else if (argc > 3) {
-//		std::cerr << "Too many arguments." << std::endl;
-//		usage(argv[0], "OFF", "Preparation Mode");
-//		exit(-1);
-//	}
-//	usage(argv[0], verbose ? "ON" : "OFF",
-//	      testmode ? "Test Mode" : "Preparation Mode");
-//
-//	PersistenceTest test("./data", verbose);
-//
-//	test.start_test(static_cast<void *>(&testmode));
-//
-//	return 0;
-//}
+int main(int argc, char *argv[])
+{
+	bool verbose = false;
+	bool testmode = false;
+
+	if (argc == 2) {
+		verbose = std::string(argv[1]) == "-v";
+		testmode = std::string(argv[1]) == "-t";
+	} else if (argc == 3) {
+		verbose = std::string(argv[1]) == "-v" ||
+			std::string(argv[2]) == "-v";
+		testmode = std::string(argv[1]) == "-t" ||
+			std::string(argv[2]) == "-t";
+	} else if (argc > 3) {
+		std::cerr << "Too many arguments." << std::endl;
+		usage(argv[0], "OFF", "Preparation Mode");
+		exit(-1);
+	}
+	usage(argv[0], verbose ? "ON" : "OFF",
+	      testmode ? "Test Mode" : "Preparation Mode");
+
+	PersistenceTest test("./data", verbose);
+
+	test.start_test(static_cast<void *>(&testmode));
+
+	return 0;
+}

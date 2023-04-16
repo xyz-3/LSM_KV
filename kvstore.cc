@@ -6,13 +6,12 @@ KVStore::KVStore(const std::string &dir): KVStoreAPI(dir)
     time = 1;
     dir_name = dir;
     mem_table = new skiplist();
-    sstable.resize(1);
+//    sstable.resize(1);
 }
 
 KVStore::~KVStore()
 {
     global::store_memtable(mem_table, dir_name + "/level-0", time);
-//    mem_table->store_memtable("", time);
     time++;
     delete mem_table;
 }
@@ -29,10 +28,10 @@ void KVStore::put(uint64_t key, const std::string &s)
     }
     //size > 2MB, save data into level0(currently just store in level 0)
     sstable_cache* res = global::store_memtable(mem_table, dir_name + "/level-0", time);
-    sstable[0].push_back(res);
+    uint64_t cur_time_stamp = res->get_timestamp();
+    sstable[0][cur_time_stamp] = res;
     delete mem_table;
     mem_table = new skiplist();
-//  std::cout << mem_table->get_size() << std::endl;
     time++;
     mem_table->put(key, s);
 }
@@ -45,24 +44,58 @@ std::string KVStore::get(uint64_t key)
     string get_value = mem_table->get(key);
 
     if(get_value == "~DELETED~") return "";
+    if(get_value != "") return get_value;
+
+    //value not exist in skiplist
+    uint64_t value_time_stamp = 0;
+    uint32_t value_size = 0;
+    string value = "";
+
+    for(auto& level_sstable : sstable){
+        for(auto& time_sstable : level_sstable.second){
+            auto cur_table = time_sstable.second;
+            if(!cur_table->is_in_range(key) || value_time_stamp >= time_sstable.first) continue;
+            if(cur_table->find_key_in_bloomfilter(key)){
+                //check if it really exists
+                index_item* index_i = cur_table->find_key_in_indexs(key, value_size);
+                if(index_i){
+                    //read data
+                    string dir_path = dir_name + "/level-" + to_string(level_sstable.first);
+                    uint64_t time_stamp = cur_table->get_timestamp();
+                    string tmp_value = global::read_disk(index_i, dir_path, time_stamp, value_size);
+                    if(tmp_value != ""){
+                        value = tmp_value;
+                        value_time_stamp = time_sstable.first;
+                    }
+                }
+            }
+        }
+    }
+
+    if(value == "~DELETED~") return "";
+
+    return value;
+
+    /*if(get_value == "~DELETED~") return "";
 
     if(get_value == ""){
         bool is_exist = false;
         for(int i = 0; i < sstable.size(); ++i){
             for(int j = 0; j < sstable[i].size(); ++j){
                 auto cur_table = sstable[i][j];
+                if(!cur_table->is_in_range(key)) continue;
                 if(cur_table->find_key_in_bloomfilter(key)){
                     uint32_t value_size = 0;
+                    //check if it really exists
                     index_item* index_i = cur_table->find_key_in_indexs(key, value_size);
                     if(index_i){
                         is_exist = true;
                         //read data from files
                         //check directory exist
-                        string dir_path = dir_name + "/level-" + to_string(i);
-                        uint64_t time_stamp = cur_table->get_timestamp();
-
-                        string value = global::read_disk(index_i, dir_path, time_stamp, value_size);
-                        return value;
+//                        string dir_path = dir_name + "/level-" + to_string(i);
+//                        uint64_t time_stamp = cur_table->get_timestamp();
+//                        string value = global::read_disk(index_i, dir_path, time_stamp, value_size);
+//                        return value;
                     }
                 }
             }
@@ -70,7 +103,7 @@ std::string KVStore::get(uint64_t key)
         if(!is_exist) return "";
     }else {
         return get_value;
-    }
+    }*/
 }
 /**
  * Delete the given key-value pair if it exists.

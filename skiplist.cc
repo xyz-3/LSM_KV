@@ -117,9 +117,6 @@ void skiplist::store_bloomfilter(sstable_cache *&ssc) {
     node* cur = head->next[0];
     while(cur){
         uint64_t cur_key = cur->get_key();
-//        if(cur_key == 2028){
-//            std::cout << "test";
-//        }
         ssc->insert_key_to_bloomfilter(cur_key);
         cur = cur->next[0];
     }
@@ -222,5 +219,5 @@ skiplist::~skiplist(){
     }
 //    memory_size = 10272;
 //    cur_level = 0;
-//    length = 0;
+    length = 0;
 }

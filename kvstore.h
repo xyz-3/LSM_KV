@@ -7,6 +7,7 @@
 #include "global.h"
 #include <fstream>
 #include <vector>
+#include <map>
 
 #define MEMTABLE_SIZE 2*1024*1024
 
@@ -15,7 +16,7 @@ private:
     /* DRAM */
     skiplist* mem_table;
     /* DISK */
-    vector<vector<sstable_cache*>> sstable;
+    map<uint64_t, map<uint64_t, sstable_cache*>> sstable; //level, time_stamp, sstable_cache
 
     /* time stamp */
     uint64_t time;

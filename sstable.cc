@@ -16,6 +16,10 @@ sstable_cache::~sstable_cache(){
 
 }
 
+bool sstable_cache::is_in_range(uint64_t &key) {
+    return (key >= min_key && key <= max_key);
+}
+
 index_item* sstable_cache::find_key_in_indexs(const uint64_t key, uint32_t& value_size){
     //binary search
     int left = 0, right = Indexs.size() - 1;

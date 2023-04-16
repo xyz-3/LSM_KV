@@ -14,7 +14,7 @@ void bloomfilter::insert(const uint64_t key) {
 
     for(int i = 0; i < hash_num; ++i){
         uint64_t hash_value = hash[i] % bitset_size;
-        bitset[hash_value] = 1;
+        bitset.set(hash_value);
     }
 }
 
@@ -23,7 +23,11 @@ bool bloomfilter::find(const uint64_t key) {
     MurmurHash3_x64_128(&key, sizeof(key), 1, &hash);
     for(int i = 0; i < hash_num; ++i){
         uint64_t hash_value = hash[i] % bitset_size;
-        if(bitset[hash_value] == 0) return false;
+        if(bitset.test(hash_value) == 0) return false;
     }
     return true;
+}
+
+void bloomfilter::saveBloomFilter(char *buf) {
+    memcpy(buf, (char*)&bitset, BLOOMFILTER_SIZE/8);
 }

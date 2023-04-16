@@ -38,17 +38,12 @@ public:
         int level;
 
         node(){}
-
         node(const uint64_t k, const string v, const int l): key(k), value(v), next(l, nullptr), level(l){}
-
         ~node() {}
 
         uint64_t get_key() const { return key;}
-
-        void set_key(const uint64_t k){ key = k;}
-
+//        void set_key(const uint64_t k){ key = k;}
         string get_value() const { return value;}
-
         void set_value(const string& s) {value = s;}
     };
 

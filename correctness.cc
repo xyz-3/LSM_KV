@@ -9,7 +9,6 @@ private:
     const uint64_t SIMPLE_TEST_MAX = 512;
     const uint64_t LARGE_TEST_MAX = 1024 * 32;
 //    const uint64_t LARGE_TEST_MAX = 1024 * 64;
-//    const uint64_t LARGE_TEST_MAX = 2877;
 
     void regular_test(uint64_t max)
     {
@@ -27,20 +26,13 @@ private:
 
         // Test multiple key-value pairs
         for (i = 0; i < max; ++i) {
-            if(i == 2876){
-                std::cout << "test";
-            }
             store.put(i, std::string(i+1, 's'));
             EXPECT(std::string(i+1, 's'), store.get(i));
         }
         phase();
 
         // Test after all insertions
-        //TODO bug here
         for (i = 0; i < max; ++i) {
-            if(i == 2028){
-                std::cout << "test";
-            }
             std::string res = store.get(i);
             EXPECT(std::string(i + 1, 's'), res);
         }
@@ -80,13 +72,11 @@ private:
             EXPECT(true, store.del(i));
 
 
-        //TODO bug here
         for (i = 0; i < max; ++i)
             EXPECT((i & 1) ? std::string(i+1, 's') : not_found,
                    store.get(i));
 
 
-        //TODO bug here
         for (i = 1; i < max; ++i)
             EXPECT(i & 1, store.del(i));
 
@@ -104,10 +94,10 @@ public:
     {
         std::cout << "KVStore Correctness Test" << std::endl;
 
-        /*store.reset();
-
-        std::cout << "[Simple Test]" << std::endl;
-        regular_test(SIMPLE_TEST_MAX);*/
+//        store.reset();
+//
+//        std::cout << "[Simple Test]" << std::endl;
+//        regular_test(SIMPLE_TEST_MAX);
 
         store.reset();
 

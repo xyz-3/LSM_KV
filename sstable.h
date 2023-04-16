@@ -43,6 +43,7 @@ public:
     void insert_key_to_bloomfilter(const uint64_t key){bloomfilter->insert(key);}
     bool find_key_in_bloomfilter(const uint64_t key){return bloomfilter->find(key);}
     index_item* find_key_in_indexs(const uint64_t key, uint32_t& value_size);
+    bool is_in_range(uint64_t& key);
     ~sstable_cache();
 };
 

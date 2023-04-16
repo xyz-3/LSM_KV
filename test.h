@@ -21,13 +21,12 @@ protected:
                 const std::string &file, int line)
     {
         ++nr_tests;
-//        std::cout << "test: " << nr_tests << " ";
         if (exp == got) {
             ++nr_passed_tests;
 //            std::cout << "passed" << nr_passed_tests << std::endl;
             return;
         }else{
-//            std::cout << "failed" << nr_passed_tests << std::endl;
+//            std::cout << "failed: " << nr_passed_tests << "/" << nr_tests << std::endl;
         }
         if (verbose) {
             std::cerr << "TEST Error @" << file << ":" << line;

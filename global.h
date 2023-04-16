@@ -6,7 +6,9 @@
 #define LSM_KV_GLOBAL_H
 #include "sstable.h"
 #include "skiplist.h"
+#include "bloomfilter.h"
 #include "utils.h"
+#include <filesystem>
 
 class global {
 public:

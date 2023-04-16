@@ -9,8 +9,9 @@
 #include <iostream>
 #include <vector>
 #include <cstring>
+#include <bitset>
 
-#define BLOOMFILTER_SIZE 10240
+#define BLOOMFILTER_SIZE 10240*8
 
 class bloomfilter {
 private:
@@ -19,17 +20,20 @@ private:
 
 public:
     uint64_t bitset_size;
-    std::vector<bool> bitset;
+//    std::vector<bool> bitset;
+    std::bitset<BLOOMFILTER_SIZE> bitset;
 
-    bloomfilter(uint64_t size = BLOOMFILTER_SIZE){
-        bitset_size = size;
+    bloomfilter(){
         hash_num = 4;
-        bitset.resize(bitset_size, false);
+        bitset_size = BLOOMFILTER_SIZE;
+//        bitset.resize(bitset_size, false);
+        bitset.reset();
     }
 
     ~bloomfilter();
     void insert(const uint64_t key);
     bool find(const uint64_t key);
+    void saveBloomFilter(char* buf);
 
 };
 
