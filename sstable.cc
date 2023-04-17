@@ -13,7 +13,6 @@ sstable_cache::sstable_cache(){
 }
 
 sstable_cache::~sstable_cache(){
-
 }
 
 bool sstable_cache::is_in_range(uint64_t &key) {

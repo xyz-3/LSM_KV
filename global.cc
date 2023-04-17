@@ -120,7 +120,7 @@ sstable_cache* global::store_memtable(skiplist *memtable, const std::string &dir
 
 //     Index Area
     uint32_t offset = 10272 + 12 * length;
-    skiplist::node* cur = memtable->head->next[0];
+    skiplist::node<uint64_t, string>* cur = memtable->head->next[0];
     while(cur){
         uint64_t cur_key = cur->get_key();
         new_sstable_cache->Indexs.push_back(index_item(cur_key, offset));
@@ -151,10 +151,6 @@ string global::read_disk(index_item* index_i, const std::string &dir_path, const
     file.open(file_path, ios_base::in|ios_base::binary);
     if(!file.is_open()) return "";
 
-//    file.seekg(0);
-
-    //get the file size
-
     /* read value */
     file.seekg(index_i->get_offset());
 
@@ -171,4 +167,50 @@ string global::read_disk(index_item* index_i, const std::string &dir_path, const
     string value_str = value;
     delete[] value;
     return value_str;
+}
+
+sstable_cache* global::read_sstable(const std::string &file_path) {
+    ifstream file;
+    file.open(file_path, ios_base::in|ios_base::binary);
+    if(!file.is_open()) return nullptr;
+
+    sstable_cache* new_sstable_cache = new sstable_cache();
+
+    /* read time stamp */
+    uint64_t time_stamp;
+    file.read((char*)&time_stamp, 8);
+    new_sstable_cache->set_timestamp(time_stamp);
+
+    /* read total num */
+    uint64_t num;
+    file.read((char*)&num, 8);
+    new_sstable_cache->set_num(num);
+
+    /* read min key */
+    uint64_t min_key;
+    file.read((char*)&min_key, 8);
+    new_sstable_cache->set_minkey(min_key);
+
+    /* read max key */
+    uint64_t max_key;
+    file.read((char*)&max_key, 8);
+    new_sstable_cache->set_maxkey(max_key);
+
+    /* read bloomfilter */
+    char* bloom_buffer = new char[10240];
+    file.read(bloom_buffer, 10240);
+    new_sstable_cache->bloomfilter = new bloomfilter();
+    new_sstable_cache->bloomfilter->loadBloomFilter(bloom_buffer);
+
+    /* read index area */
+    for(int i = 0; i < num; i++){
+        uint64_t key;
+        uint32_t offset;
+        file.read((char*)&key, 8);
+        file.read((char*)&offset, 4);
+        new_sstable_cache->Indexs.push_back(index_item(key, offset));
+    }
+
+    file.close();
+    return new_sstable_cache;
 }

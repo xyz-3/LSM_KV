@@ -6,14 +6,24 @@ KVStore::KVStore(const std::string &dir): KVStoreAPI(dir)
     time = 1;
     dir_name = dir;
     mem_table = new skiplist();
-//    sstable.resize(1);
+
+    /* read data from disk and config sstable */
+    read_data_from_disk();
 }
 
 KVStore::~KVStore()
 {
-    global::store_memtable(mem_table, dir_name + "/level-0", time);
+    if(mem_table && mem_table->head && mem_table->head->next[0]) {
+        global::store_memtable(mem_table, dir_name + "/level-0", time);
+    }
     time++;
     delete mem_table;
+    /* Remove sstable */
+    for(int i = 0; i < sstable.size(); ++i){
+        for(int j = 0; j < sstable[i].size(); ++j){
+            delete sstable[i][j];
+        }
+    }
 }
 
 /**
@@ -54,6 +64,7 @@ std::string KVStore::get(uint64_t key)
     for(auto& level_sstable : sstable){
         for(auto& time_sstable : level_sstable.second){
             auto cur_table = time_sstable.second;
+            if(!cur_table) continue;
             if(!cur_table->is_in_range(key) || value_time_stamp >= time_sstable.first) continue;
             if(cur_table->find_key_in_bloomfilter(key)){
                 //check if it really exists
@@ -75,35 +86,6 @@ std::string KVStore::get(uint64_t key)
     if(value == "~DELETED~") return "";
 
     return value;
-
-    /*if(get_value == "~DELETED~") return "";
-
-    if(get_value == ""){
-        bool is_exist = false;
-        for(int i = 0; i < sstable.size(); ++i){
-            for(int j = 0; j < sstable[i].size(); ++j){
-                auto cur_table = sstable[i][j];
-                if(!cur_table->is_in_range(key)) continue;
-                if(cur_table->find_key_in_bloomfilter(key)){
-                    uint32_t value_size = 0;
-                    //check if it really exists
-                    index_item* index_i = cur_table->find_key_in_indexs(key, value_size);
-                    if(index_i){
-                        is_exist = true;
-                        //read data from files
-                        //check directory exist
-//                        string dir_path = dir_name + "/level-" + to_string(i);
-//                        uint64_t time_stamp = cur_table->get_timestamp();
-//                        string value = global::read_disk(index_i, dir_path, time_stamp, value_size);
-//                        return value;
-                    }
-                }
-            }
-        }
-        if(!is_exist) return "";
-    }else {
-        return get_value;
-    }*/
 }
 /**
  * Delete the given key-value pair if it exists.
@@ -126,15 +108,69 @@ void KVStore::reset()
 {
     /* Remove memtable */
     delete mem_table;
-
     mem_table = new skiplist();
 
-    /* Remove sstables files */
-    for(int i = 0; i < sstable.size(); ++i){
-        for(int j = 0; j < sstable[i].size(); ++j){
-            delete sstable[i][j];
+    /* Remove sstable */
+//    for(int i = 0; i < sstable.size(); ++i){
+//        for(int j = 0; j < sstable[i].size(); ++j){
+//            delete sstable[i][j];
+//        }
+//    }
+
+    /* Remove sstable files and directories */
+    vector<string> dir_list;
+    utils::scanDir(dir_name, dir_list);
+    for(auto dir_nm : dir_list){
+        if(dir_nm == "." || dir_nm == "..") continue;
+        string dir_path = dir_name + "/" + dir_nm;
+        vector<string> file_list;
+        utils::scanDir(dir_path, file_list);
+        for(auto file_name : file_list){
+            if(file_name == "." || file_name == "..") continue;
+            string file_path = dir_path + "/" + file_name;
+            utils::rmfile(file_path.c_str());
+        }
+        utils::rmdir(dir_path.c_str());
+    }
+
+    /* Reset time stamp */
+    time = 1;
+}
+
+
+void KVStore::read_data_from_disk() {
+    vector<string> dir_list;
+    utils::scanDir(dir_name, dir_list);
+    for(auto dir_nm : dir_list){
+        if(dir_nm == "." || dir_nm == "..") continue;
+        string dir_path = dir_name + "/" + dir_nm;
+        vector<string> file_list;
+        utils::scanDir(dir_path, file_list);
+        for(auto file_name : file_list){
+            if(file_name == "." || file_name == "..") continue;
+            string file_path = dir_path + "/" + file_name;
+            //get level and time stamp
+            uint64_t level, time_stamp;
+            get_level_timeStamp(level, time_stamp, file_path);
+
+            //open file and read data
+            sstable_cache* history_sstable = global::read_sstable(file_path);
+            //store history data to sstable
+            sstable[level][time_stamp] = history_sstable;
         }
     }
+}
+
+void KVStore::get_level_timeStamp(uint64_t &level, uint64_t &time_stamp, const std::string &file_name) {
+    string tmp = file_name;
+    //filename format: ./data/level-20/123.sst
+    tmp = tmp.substr(0, tmp.size() - 4);
+    tmp = tmp.substr(tmp.find_last_of("/") + 1);
+    time_stamp = stoull(tmp);
+    tmp = file_name;
+    tmp = tmp.substr(0, tmp.find_last_of("/"));
+    tmp = tmp.substr(tmp.find_last_of("-") + 1);
+    level = stoull(tmp);
 }
 
 /**

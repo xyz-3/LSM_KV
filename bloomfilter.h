@@ -35,6 +35,10 @@ public:
     bool find(const uint64_t key);
     void saveBloomFilter(char* buf);
 
+    void loadBloomFilter(char* buf){
+        memcpy((char*)&bitset, buf, BLOOMFILTER_SIZE/8);
+    }
+
 };
 
 

@@ -14,6 +14,8 @@ class global {
 public:
     static sstable_cache* store_memtable(skiplist* memtable, const std::string& dir_path, const uint64_t time_stamp);
     static string read_disk(index_item* index_i, const std::string& dir_path, const uint64_t& time_stamp, uint32_t& value_size);
+    static sstable_cache* read_sstable(const std::string& file_path);
+
 };
 
 

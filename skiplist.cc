@@ -10,11 +10,11 @@ skiplist::skiplist(int maxlevel){
     length = 0;
     memory_size = 10272;
 
-    head = new node(0, "", max_level);
+    head = new node<uint64_t , string>(0, "", max_level);
 }
 
 string skiplist::get(uint64_t key) const{
-    node* cur = head;
+    node<uint64_t , string>* cur = head;
     for(int i = cur_level - 1; i >= 0; --i){
         while(cur->next[i] && (cur->next[i]->get_key() < key)){
             cur = cur->next[i];
@@ -29,20 +29,26 @@ string skiplist::get(uint64_t key) const{
 }
 
 void skiplist::put(uint64_t key, const string& s){
-    vector<node *> store(max_level, head);
-    node* cur = head;
-    for(int i = cur_level - 1; i >= 0; --i){
+    node<uint64_t , string>* store[max_level + 1];
+    memset(store, 0, sizeof(node<uint64_t , string>*)*(max_level + 1));
+    //copy head to store
+//    memcpy(store, head, sizeof(node<uint64_t , string>*)*(max_level + 1));
+
+    node<uint64_t , string>* cur = head;
+    for(int i = cur_level; i >= 0; --i){
         while(cur->next[i] && (cur->next[i]->get_key() < key)){
             cur = cur->next[i];
         }
         store[i] = cur;
     }
 
-    //have same key
-    if(cur->next[0] && key == cur->next[0]->get_key()){
-        if(s == cur->next[0]->get_value()) return;
+    cur = cur->next[0];
 
-        const string old_s = cur->next[0]->get_value();
+    //have same key
+    if(cur && key == cur->get_key()){
+        if(s == cur->get_value()) return;
+
+        const string old_s = cur->get_value();
         memory_size += s.size() - old_s.size();
 
         int tmp_level = cur_level;
@@ -59,14 +65,17 @@ void skiplist::put(uint64_t key, const string& s){
 
     int ran_level = random_level();
     if(ran_level > cur_level){
+        for (int i = cur_level + 1; i < ran_level + 1; i++) {
+            store[i] = head;
+        }
         cur_level = ran_level;
     }
-    node* new_node = new node(key, s, ran_level);
+    node<uint64_t , string>* new_node = new node<uint64_t , string>(key, s, ran_level);
 
     for(int i = 0; i < ran_level; ++i){
         new_node->next[i] = store[i]->next[i];
         store[i]->next[i] = new_node;
-        new_node->prev = store[i];
+//        new_node->prev = store[i];
     }
 
     //offset: uint32_t  key:uint64_t
@@ -99,13 +108,13 @@ uint64_t skiplist::get_length() const{
 }
 
 uint64_t skiplist::get_min_key() const {
-    node* cur = head->next[0];
+    node<uint64_t , string>* cur = head->next[0];
     uint64_t min_key = cur->get_key();
     return min_key;
 }
 
 uint64_t skiplist::get_max_key() const {
-    node* cur = head->next[0];
+    node<uint64_t , string>* cur = head->next[0];
     while(cur->next[0]){
         cur = cur->next[0];
     }
@@ -114,7 +123,7 @@ uint64_t skiplist::get_max_key() const {
 }
 
 void skiplist::store_bloomfilter(sstable_cache *&ssc) {
-    node* cur = head->next[0];
+    node<uint64_t , string>* cur = head->next[0];
     while(cur){
         uint64_t cur_key = cur->get_key();
         ssc->insert_key_to_bloomfilter(cur_key);
@@ -211,13 +220,15 @@ sstable_cache* skiplist::store_memtable(const string& dir, const uint64_t time){
 */
 
 skiplist::~skiplist(){
-    auto cur = head;
-    while(cur){
-        auto tmp = cur;
-        cur = cur->next[0];
-        delete tmp;
-    }
-//    memory_size = 10272;
-//    cur_level = 0;
+//    auto cur = head;
+//    while(cur){
+//        auto tmp = cur;
+//        cur = cur->next[0];
+//        delete tmp;
+//    }
+//    head = nullptr;
+    delete head;
+    memory_size = 10272;
+    cur_level = 0;
     length = 0;
 }

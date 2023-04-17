@@ -22,6 +22,11 @@ private:
     uint64_t time;
     /* dir */
     string dir_name;
+
+    void read_data_from_disk();
+
+    void get_level_timeStamp(uint64_t& level, uint64_t& time_stamp, const string& file_name);
+
 public:
     KVStore(const std::string &dir);
 

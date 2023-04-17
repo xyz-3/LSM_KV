@@ -94,10 +94,10 @@ public:
     {
         std::cout << "KVStore Correctness Test" << std::endl;
 
-//        store.reset();
-//
-//        std::cout << "[Simple Test]" << std::endl;
-//        regular_test(SIMPLE_TEST_MAX);
+        store.reset();
+
+        std::cout << "[Simple Test]" << std::endl;
+        regular_test(SIMPLE_TEST_MAX);
 
         store.reset();
 

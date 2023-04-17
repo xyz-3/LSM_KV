@@ -27,28 +27,40 @@ private:
     mt19937 gen{random_device{}()};
     uniform_real_distribution<double> dis;
 public:
+
+
+    template<typename K, typename V>
     struct node{
     private:
         uint64_t key;
         string value;
 
     public:
-        vector<node*> next;
-        node* prev = nullptr;
+        node<K , V> **next;
+
+//        vector<node*> next;
         int level;
 
         node(){}
-        node(const uint64_t k, const string v, const int l): key(k), value(v), next(l, nullptr), level(l){}
-        ~node() {}
+        node(const K k, const V v, const int l): key(k), value(v), level(l){
+            next = new node<K,V>*[level + 1];
 
-        uint64_t get_key() const { return key;}
-//        void set_key(const uint64_t k){ key = k;}
-        string get_value() const { return value;}
-        void set_value(const string& s) {value = s;}
+            memset(next, 0, sizeof(node<K, V>*)*(level + 1));
+        }
+        ~node() {
+//            for (node* n : next) {
+//                delete n;
+//            }
+            delete []next;
+        }
+
+        K get_key() const { return key;}
+        V get_value() const { return value;}
+        void set_value(const V& s) {value = s;}
     };
 
 
-    node* head;
+    node<uint64_t, string>* head;
 
     skiplist(int maxlevel = 16);
 
