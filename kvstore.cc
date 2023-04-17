@@ -9,6 +9,7 @@ KVStore::KVStore(const std::string &dir): KVStoreAPI(dir)
 
     /* read data from disk and config sstable */
     read_data_from_disk();
+    read_mode();
 }
 
 KVStore::~KVStore()
@@ -19,13 +20,12 @@ KVStore::~KVStore()
     time++;
     delete mem_table;
     /* Remove sstable */
-    for(int i = 0; i < sstable.size(); ++i){
-        for(int j = 0; j < sstable[i].size(); ++j){
-            delete sstable[i][j];
-        }
-    }
+//    for(int i = 0; i < sstable.size(); ++i){
+//        for(int j = 0; j < sstable[i].size(); ++j){
+//            delete sstable[i][j];
+//        }
+//    }
 }
-
 /**
  * Insert/Update the key-value pair.
  * No return values for simplicity.
@@ -137,7 +137,6 @@ void KVStore::reset()
     time = 1;
 }
 
-
 void KVStore::read_data_from_disk() {
     vector<string> dir_list;
     utils::scanDir(dir_name, dir_list);
@@ -174,11 +173,97 @@ void KVStore::get_level_timeStamp(uint64_t &level, uint64_t &time_stamp, const s
 }
 
 /**
- * Scan is optional
  * Return a list including all the key-value pair between key1 and key2.
  * keys in the list should be in an ascending order.
  * An empty string indicates not found.
  */
 void KVStore::scan(uint64_t key1, uint64_t key2, std::list<std::pair<uint64_t, std::string> > &list)
 {
+}
+
+
+void KVStore::select_file(vector<pair<uint64_t, uint64_t>> &x_select_files,
+                          vector<pair<uint64_t, uint64_t>> &y_select_files, uint64_t level_x, uint64_t level_y) {
+    //select level_x
+    //if level_x mode is Tiering, select all files
+    if(level_mode[level_x].second == Tiering){
+        for(auto& time_sstable : sstable[level_x]){
+            x_select_files.push_back(make_pair(level_x, time_sstable.first));
+        }
+    }else{
+        //select files
+        uint64_t select_num = sstable[level_x].size() - level_mode[level_x].first;
+
+    }
+
+
+}
+
+void KVStore::compaction(uint64_t level_x, uint64_t level_y) {
+    //check if level_x is empty
+    if(sstable[level_x].empty()) return;
+    //check if level_x file nums is greater than limits
+    if(sstable[level_x].size() <= level_mode[level_x].first) return;
+
+    //select sstable
+    vector<pair<uint64_t, uint64_t>> x_select_files, y_select_files;  //<level, time stamp>
+    select_file(x_select_files, y_select_files, level_x, level_y);
+
+
+
+    /*//get all sstable in level_x
+    vector<sstable_cache*> level_x_sstable;
+    for(auto& time_sstable : sstable[level_x]){
+        level_x_sstable.push_back(time_sstable.second);
+    }
+
+    //merge all sstable in level_x
+    sstable_cache* merged_sstable = global::merge_sstable(level_x_sstable);
+
+    //write merged sstable to disk
+    string dir_path = dir_name + "/level-" + to_string(level_y);
+    string file_path = dir_path + "/" + to_string(time) + ".sst";
+    global::write_sstable(merged_sstable, file_path);
+
+    //update sstable
+    sstable[level_y][time] = merged_sstable;
+
+    //delete old sstable
+    for(auto& time_sstable : sstable[level_x]){
+        delete time_sstable.second;
+    }
+    sstable[level_x].clear();
+
+    //update time
+    time++;*/
+}
+
+//pass
+void KVStore::read_mode() {
+    ifstream file;
+    file.open(MODE_FILE_PATH, ios::in);
+
+    if(!file.is_open()){
+        return;
+    }
+
+    //read lines from file
+    //line format: level file_max_num mode
+    string line;
+    uint64_t level, num;
+    mode l_mode;
+    while(getline(file, line)){
+        stringstream ss(line);
+        ss >> level >> num;
+        string mode_str;
+        ss >> mode_str;
+        if(mode_str == "Tiering"){
+            l_mode = Tiering;
+        }else{
+            l_mode = Leveling;
+        }
+        level_mode[level] = make_pair(num, l_mode);
+    }
+
+    file.close();
 }

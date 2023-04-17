@@ -10,6 +10,7 @@
 #include <map>
 
 #define MEMTABLE_SIZE 2*1024*1024
+#define MODE_FILE_PATH "../config/default.conf"
 
 class KVStore : public KVStoreAPI {
 private:
@@ -23,9 +24,20 @@ private:
     /* dir */
     string dir_name;
 
+    /* read level mode */
+    enum mode{
+        Tiering,
+        Leveling
+    };
+    map<uint64_t, pair<uint64_t, mode>> level_mode;
+    void read_mode();
+
     void read_data_from_disk();
 
     void get_level_timeStamp(uint64_t& level, uint64_t& time_stamp, const string& file_name);
+
+    void compaction(uint64_t level_x, uint64_t level_y);
+    void select_file(vector<pair<uint64_t, uint64_t>>& x_select_files, vector<pair<uint64_t, uint64_t>>& y_select_files, uint64_t level_x, uint64_t level_y);
 
 public:
     KVStore(const std::string &dir);
