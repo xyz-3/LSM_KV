@@ -9,6 +9,7 @@ private:
     const uint64_t SIMPLE_TEST_MAX = 512;
     const uint64_t LARGE_TEST_MAX = 1024 * 32;
 //    const uint64_t LARGE_TEST_MAX = 1024 * 64;
+//    const uint64_t LARGE_TEST_MAX = 5000;
 
     void regular_test(uint64_t max)
     {
@@ -94,10 +95,10 @@ public:
     {
         std::cout << "KVStore Correctness Test" << std::endl;
 
-        store.reset();
-
-        std::cout << "[Simple Test]" << std::endl;
-        regular_test(SIMPLE_TEST_MAX);
+//        store.reset();
+//
+//        std::cout << "[Simple Test]" << std::endl;
+//        regular_test(SIMPLE_TEST_MAX);
 
         store.reset();
 

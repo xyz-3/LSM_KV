@@ -74,15 +74,18 @@
 //    return new_sstable_cache;
 //}
 
-sstable_cache* global::store_memtable(skiplist *memtable, const std::string &dir_path, const uint64_t time_stamp) {
-    sstable_cache* new_sstable_cache = new sstable_cache();
+sstable_cache* global::store_memtable(skiplist *memtable, const std::string &dir_path, const uint64_t time_stamp, const uint64_t tag) {
+    auto* new_sstable_cache = new sstable_cache();
+
+    /* set tag */
+    new_sstable_cache->set_tag(tag);
 
     if(!utils::dirExists(dir_path)){
         utils::mkdir(dir_path.c_str());
     }
 
-//     File Path & Add time stamp
-    string file_path = dir_path + "/" + to_string(time_stamp) + ".sst";
+    /* File Path & Add time stamp */
+    string file_path = dir_path + "/" + to_string(time_stamp) + "_" + to_string(tag) + ".sst";
     ofstream file;
     file.open(file_path, ios::out | ios::binary);
 
@@ -92,16 +95,16 @@ sstable_cache* global::store_memtable(skiplist *memtable, const std::string &dir
 
     file.seekp(0);
 
-//     Set time stamp
+    /* Set time stamp */
     new_sstable_cache->set_timestamp(time_stamp);
     file.write((char*)&time_stamp, 8);
 
-//     Set total num
+    /* Set total num */
     uint64_t length = memtable->get_length();
     new_sstable_cache->set_num(length);
     file.write((const char*)&length, 8);
 
-//     Set min & max key
+    /* Set min & max key */
     uint64_t min_key = memtable->get_min_key();
     new_sstable_cache->set_minkey(min_key);
     file.write((const char*)&min_key, 8);
@@ -110,27 +113,26 @@ sstable_cache* global::store_memtable(skiplist *memtable, const std::string &dir
     new_sstable_cache->set_maxkey(max_key);
     file.write((const char*)&max_key, 8);
 
-//     BloomFilter
+    /* BloomFilter */
     memtable->store_bloomfilter(new_sstable_cache);
     char* bloom_buffer = new char[10240];
     new_sstable_cache->bloomfilter->saveBloomFilter(bloom_buffer);
-//    file.write((const char*)&new_sstable_cache->bloomfilter->bitset, 10240);
     file.write(bloom_buffer, 10240);
     delete[] bloom_buffer;
 
-//     Index Area
+    /* Index Area */
     uint32_t offset = 10272 + 12 * length;
     skiplist::node<uint64_t, string>* cur = memtable->head->next[0];
     while(cur){
         uint64_t cur_key = cur->get_key();
-        new_sstable_cache->Indexs.push_back(index_item(cur_key, offset));
+        new_sstable_cache->Indexs.emplace_back(cur_key, offset);
         file.write((const char*)&cur_key, 8);
         file.write((const char*)&offset, 4);
         offset += cur->get_value().size();
         cur = cur->next[0];
     }
 
-//     Value Area
+    /* Value Area */
     cur = memtable->head->next[0];
     while(cur){
         string cur_value = cur->get_value();
@@ -143,10 +145,11 @@ sstable_cache* global::store_memtable(skiplist *memtable, const std::string &dir
     return new_sstable_cache;
 }
 
-string global::read_disk(index_item* index_i, const std::string &dir_path, const uint64_t &time_stamp, uint32_t &value_size) {
+//add tag
+string global::read_disk(index_item* index_i, const std::string &dir_path, const uint64_t &time_stamp, const uint64_t &tag, uint32_t &value_size) {
     if(!utils::dirExists(dir_path)) return "";
 
-    string file_path = dir_path + "/" + to_string(time_stamp) + ".sst";
+    string file_path = dir_path + "/" + to_string(time_stamp) + "_" + to_string(tag) + ".sst";
     ifstream file;
     file.open(file_path, ios_base::in|ios_base::binary);
     if(!file.is_open()) return "";
@@ -174,7 +177,7 @@ sstable_cache* global::read_sstable(const std::string &file_path) {
     file.open(file_path, ios_base::in|ios_base::binary);
     if(!file.is_open()) return nullptr;
 
-    sstable_cache* new_sstable_cache = new sstable_cache();
+    auto* new_sstable_cache = new sstable_cache();
 
     /* read time stamp */
     uint64_t time_stamp;
@@ -208,7 +211,7 @@ sstable_cache* global::read_sstable(const std::string &file_path) {
         uint32_t offset;
         file.read((char*)&key, 8);
         file.read((char*)&offset, 4);
-        new_sstable_cache->Indexs.push_back(index_item(key, offset));
+        new_sstable_cache->Indexs.emplace_back(key, offset);
     }
 
     file.close();

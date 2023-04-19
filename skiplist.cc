@@ -70,7 +70,7 @@ void skiplist::put(uint64_t key, const string& s){
         }
         cur_level = ran_level;
     }
-    node<uint64_t , string>* new_node = new node<uint64_t , string>(key, s, ran_level);
+    auto* new_node = new node<uint64_t , string>(key, s, ran_level);
 
     for(int i = 0; i < ran_level; ++i){
         new_node->next[i] = store[i]->next[i];

@@ -5,17 +5,17 @@
 #include "sstable.h"
 
 sstable_cache::sstable_cache(){
-    time_stamp = 0;
+    tag = 1;
+    time_stamp = 1;
     pair_num = 0;
     min_key = 0;
     max_key = 0;
     bloomfilter = new class bloomfilter();
 }
 
-sstable_cache::~sstable_cache(){
-}
+sstable_cache::~sstable_cache()= default;
 
-bool sstable_cache::is_in_range(uint64_t &key) {
+bool sstable_cache::is_in_range(uint64_t &key) const {
     return (key >= min_key && key <= max_key);
 }
 

@@ -8,19 +8,39 @@
 #include <fstream>
 #include <vector>
 #include <map>
+#include <queue>
+#include <set>
 
-#define MEMTABLE_SIZE 2*1024*1024
+#define MEMTABLE_SIZE (2*1024*1024)
 #define MODE_FILE_PATH "../config/default.conf"
+
+class cmp{
+public:
+    bool operator()(sstable_cache* sa, sstable_cache* sb){
+        if(sa->get_timestamp() == sb->get_timestamp()){
+            if(sa->get_min_key() == sb->get_min_key()){
+                return sa->get_max_key() > sb->get_max_key();
+            }else{
+                return sa->get_min_key() > sb->get_min_key();
+            }
+        }else {
+            return sa->get_timestamp() > sb->get_timestamp();
+        }
+    }
+};
+
 
 class KVStore : public KVStoreAPI {
 private:
     /* DRAM */
     skiplist* mem_table;
     /* DISK */
-    map<uint64_t, map<uint64_t, sstable_cache*>> sstable; //level, time_stamp, sstable_cache
+    map<uint64_t, map<pair<uint64_t, uint64_t>, sstable_cache*>> sstable; //level, time_stamp, tag, sstable_cache
 
     /* time stamp */
     uint64_t time;
+    /* tag */
+    uint64_t TAG;
     /* dir */
     string dir_name;
 
@@ -34,13 +54,31 @@ private:
 
     void read_data_from_disk();
 
-    void get_level_timeStamp(uint64_t& level, uint64_t& time_stamp, const string& file_name);
+    static void get_level_timeStamp_tag(uint64_t& level, uint64_t& time_stamp, uint64_t& tag, const string& file_name);
 
     void compaction(uint64_t level_x, uint64_t level_y);
-    void select_file(vector<pair<uint64_t, uint64_t>>& x_select_files, vector<pair<uint64_t, uint64_t>>& y_select_files, uint64_t level_x, uint64_t level_y);
+
+    void select_file(vector<pair<uint64_t, uint64_t>>& x_select_files,
+                     vector<pair<uint64_t, uint64_t>>& y_select_files,
+                     uint64_t level_x,
+                     uint64_t level_y);
+
+    void read_key_value_from_disk(uint64_t& level, uint64_t& time_stamp, uint64_t& tag,
+                                  sstable_cache* cur_sstable,
+                                  map<uint64_t, pair<pair<uint64_t, uint64_t>, string>>& key_value);
+
+    void compaction_write(map<uint64_t, pair<pair<uint64_t, uint64_t>, string>>& key_value, uint64_t& level);
+
+    void write(uint64_t& level,
+               uint64_t& num,
+               uint64_t& min_key,
+               uint64_t& max_key,
+               uint64_t& t_s,
+               bloomfilter*& blm,
+               vector<pair<uint64_t, string>>& kvs);
 
 public:
-    KVStore(const std::string &dir);
+    explicit KVStore(const std::string &dir);
 
     ~KVStore();
 
