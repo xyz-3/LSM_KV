@@ -179,6 +179,7 @@ void KVStore::get_level_timeStamp_tag(uint64_t &level, uint64_t &time_stamp, uin
     tmp = tmp.substr(0, tmp.find_last_of("_"));
     time_stamp = stoull(tmp);
     //tag
+    tmp = file_name;
     tmp = tmp.substr(0, tmp.size() - 4);
     tmp = tmp.substr(tmp.find_last_of("/") + 1);
     tmp = tmp.substr(tmp.find_last_of("_") + 1);
