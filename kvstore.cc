@@ -18,12 +18,15 @@ KVStore::~KVStore()
 {
     /* store mem_table to disk if it is not empty */
     if(mem_table && mem_table->head && mem_table->head->next[0]) {
-        global::store_memtable(mem_table, dir_name + "/level-0", time, TAG);
+        sstable_cache* res = global::store_memtable(mem_table, dir_name + "/level-0", time, TAG);
+        uint64_t cur_ts = res->get_timestamp();
+        uint64_t cur_tg = res->get_tag();
+        sstable[0][{cur_ts, cur_tg}] = res;
+        delete mem_table;
         time++;
         TAG++;
-//        compaction(0, 1);
+        compaction(0, 1);
     }
-    delete mem_table;
 }
 
 /**
@@ -46,7 +49,7 @@ void KVStore::put(uint64_t key, const std::string &s)
     time++;
     TAG++;
     mem_table->put(key, s);
-//    compaction(0, 1);
+    compaction(0, 1);
 }
 
 /**
@@ -68,7 +71,7 @@ std::string KVStore::get(uint64_t key)
 
     for(auto& level_sstable : sstable){
         for(auto& time_tag_sstable : level_sstable.second){
-//            for(auto& tag_sstable : time_sstable.second) {
+//            for(auto&_sstable : time_sstable.second) {
                 auto cur_table = time_tag_sstable.second;
                 if (!cur_table) continue;
                 if (!cur_table->is_in_range(key) || value_time_stamp > time_tag_sstable.first.first || (value_time_stamp == time_tag_sstable.first.first && value_tag > time_tag_sstable.first.second)) continue;
@@ -217,7 +220,6 @@ void KVStore::select_file(vector<pair<uint64_t, uint64_t>> &x_select_files,
         uint64_t select_num = sstable[level_x].size() - level_mode[level_x].first;
         priority_queue<sstable_cache*, vector<sstable_cache*>, cmp> pq;
         for(auto& time_tag_sstable : sstable[level_x]){
-//            for(auto& tag_sstable : time_sstable.second){
             pq.push(time_tag_sstable.second);
             if(pq.size() > select_num) pq.pop();
         }
@@ -234,7 +236,6 @@ void KVStore::select_file(vector<pair<uint64_t, uint64_t>> &x_select_files,
     }else { //level_y mode is Leveling
         //get the min key & max key of selected files in level_x
         for(auto& level_tag : x_select_files){
-//            sstable_cache* cur_sstable = sstable[level_x][level_tag.first][level_tag.second];
             sstable_cache* cur_sstable = sstable[level_x][make_pair(level_tag.first, level_tag.second)];
             if(cur_sstable == nullptr) continue;
             level_x_min_key = min(level_x_min_key, cur_sstable->get_min_key());
@@ -242,7 +243,6 @@ void KVStore::select_file(vector<pair<uint64_t, uint64_t>> &x_select_files,
         }
         //all the files in level_y that have key range in [min_key, max_key] will be selected
         for(auto& time_tag_sstable : sstable[level_y]){
-//            for(auto& tag_sstable : time_sstable.second){
             sstable_cache* cur_sstable = time_tag_sstable.second;
             if(cur_sstable == nullptr) continue;
             if(!(cur_sstable->get_min_key() > level_x_max_key || cur_sstable->get_max_key() < level_x_min_key)){
@@ -254,7 +254,8 @@ void KVStore::select_file(vector<pair<uint64_t, uint64_t>> &x_select_files,
 
 void KVStore::read_key_value_from_disk(uint64_t &level, uint64_t &time_stamp, uint64_t &tag,
                                        sstable_cache* cur_sstable,
-                                       map<uint64_t, pair<pair<uint64_t, uint64_t>, string>> &key_value) {
+                                       map<uint64_t, pair<pair<uint64_t, uint64_t>, string>> &key_value,
+                                       set<uint64_t> &keys) {
     //get file path
     string file_path = dir_name + "/level-" + to_string(level) + "/" + to_string(time_stamp) + "_" + to_string(tag) + ".sst";
 
@@ -267,7 +268,6 @@ void KVStore::read_key_value_from_disk(uint64_t &level, uint64_t &time_stamp, ui
 
     //read key value
     auto& indexs = cur_sstable->Indexs;
-    set<uint64_t> keys;
     for(int i = 0; i < indexs.size(); ++i){
         uint64_t key = indexs[i].get_key();
         uint32_t offset = indexs[i].get_offset();
@@ -299,13 +299,52 @@ void KVStore::read_key_value_from_disk(uint64_t &level, uint64_t &time_stamp, ui
 }
 
 void KVStore::write(uint64_t &level, uint64_t &num, uint64_t &min_key,
-                    uint64_t &max_key, uint64_t &t_s, bloomfilter*& blm,
+                    uint64_t &max_key, uint64_t &t_s, uint64_t& size,
                     vector<pair<uint64_t, std::string>> &kvs) {
     auto new_sstable = new sstable_cache();
     new_sstable->set_tag(TAG);
-    //write data to disk
-    string file_path = dir_name + "/level-" + to_string(level) + "/" + to_string(t_s) + "_" + to_string(TAG) + ".sst";
+
+    char* buffer = new char[size];
+    //set time stamp
+    new_sstable->set_timestamp(t_s);
+    memcpy(buffer, &t_s, 8);
+    //set total num
+    new_sstable->set_num(num);
+    memcpy(buffer + 8, &num, 8);
+    //set min key
+    new_sstable->set_minkey(min_key);
+    memcpy(buffer + 16, &min_key, 8);
+
+    char* index_area = buffer + 10272;
+    uint32_t offset = 10272 + 12 * num;
+    for(int i = 0; i < kvs.size(); ++i){
+        auto kv = kvs[i];
+        uint64_t cur_key = kv.first;
+        new_sstable->bloomfilter->insert(cur_key);
+        //write index area
+        *(uint64_t*)index_area = cur_key;
+        index_area += 8;
+        *(uint32_t*)index_area = offset;
+        index_area += 4;
+
+        new_sstable->Indexs.emplace_back(index_item(cur_key, offset));
+        //write value area
+        uint32_t value_size = kv.second.size();
+        memcpy(buffer + offset, kv.second.c_str(), value_size);
+        offset += value_size;
+
+        if(i == kvs.size() - 1){
+            //write max key
+            uint64_t max_key = cur_key;
+            memcpy(buffer + 24, &max_key, 8);
+            new_sstable->set_maxkey(max_key);
+        }
+    }
+    //write bloomfilter
+    new_sstable->bloomfilter->saveBloomFilter(buffer + 32);
+
     //open file
+    string file_path = dir_name + "/level-" + to_string(level) + "/" + to_string(t_s) + "_" + to_string(TAG) + ".sst";
     ofstream file;
     file.open(file_path, ios::out | ios::binary);
 
@@ -314,54 +353,55 @@ void KVStore::write(uint64_t &level, uint64_t &num, uint64_t &min_key,
     }
 
     file.seekp(0);
+    file.write(buffer, size);
+    file.close();
+    delete[] buffer;
 
-    /* Set time stamp */
-    file.write((char*)&t_s, 8);
+
+    /* Set time stamp *//*
     new_sstable->set_timestamp(t_s);
-
-    /* Set total num */
-    file.write((char*)&num, 8);
+    file.write((char*)&t_s, 8);
+    *//* Set total num *//*
     new_sstable->set_num(num);
-
-    /* Set min key */
+    file.write((char*)&num, 8);
+    *//* Set min key *//*
     file.write((char*)&min_key, 8);
     new_sstable->set_minkey(min_key);
-
-    /* Set max key */
+    *//* Set max key *//*
     file.write((char*)&max_key, 8);
     new_sstable->set_maxkey(max_key);
-
-    /* Set bloom filter */
+    *//* Set bloom filter *//*
+    //store data to bloomfilter
+    for(auto& kv : kvs){
+        uint64_t cur_key = kv.first;
+        new_sstable->insert_key_to_bloomfilter(cur_key);
+    }
     char* bloom_buffer = new char[10240];
-    blm->saveBloomFilter(bloom_buffer);
+    new_sstable->bloomfilter->saveBloomFilter(bloom_buffer);
     file.write(bloom_buffer, 10240);
-    new_sstable->bloomfilter = blm;
     delete[] bloom_buffer;
-
-    /* Index Area */
+    *//* Index Area *//*
     uint32_t offset = 10272 + 12 * num;
     for(auto& kv : kvs){
-        file.write((const char*)&kv.first, 8);
+        uint64_t cur_key = kv.first;
+        new_sstable->Indexs.emplace_back(cur_key, offset);
+        file.write((const char*)&cur_key, 8);
         file.write((const char*)&offset, 4);
-        new_sstable->Indexs.emplace_back(kv.first, offset);
-        offset += kv.second.size();
+        string cur_value = kv.second;
+        offset += cur_value.size();
     }
-
-    /* Value Area */
+    *//* Value Area *//*
     for(auto& kv : kvs){
         string v = kv.second;
-        file.write((const char*)&v, v.size());
-    }
-
-    file.close();
+        auto v_str = v.c_str();
+        file.write((char*)&v_str, v.size());
+    }*/
     sstable[level][make_pair(t_s, TAG)] = new_sstable;
 }
 
-void KVStore::compaction_write(map<uint64_t, pair<pair<uint64_t, uint64_t>, std::string>> &key_value, uint64_t& level) {
+void KVStore::compaction_write(map<uint64_t, pair<pair<uint64_t, uint64_t>, std::string>> &key_value, uint64_t& level, uint64_t& new_time_stamp) {
     uint64_t memory_size = 10272;
-    uint64_t new_timestamp = 1;
     uint64_t min_key = UINT_MAX, max_key = 0, num = 0;
-    auto* new_bloomfilter = new bloomfilter();
     vector<pair<uint64_t, string>> kvs;
 
     // read key_value pairs
@@ -369,27 +409,22 @@ void KVStore::compaction_write(map<uint64_t, pair<pair<uint64_t, uint64_t>, std:
         uint64_t key = key_value_pair.first;
         string value = key_value_pair.second.second;
         if(memory_size + 12 + value.size() >= MEMTABLE_SIZE){
-            write(level, num, min_key, max_key, new_timestamp, new_bloomfilter, kvs);
+            write(level, num, min_key, max_key, new_time_stamp, memory_size, kvs);
             min_key = UINT_MAX; max_key = 0;
-            new_bloomfilter = new bloomfilter();
             num = 0;
-            new_timestamp = 1;
             TAG++;
             memory_size = 10272;
             kvs.clear();
-        }
-        if(key_value_pair.second.first.first > new_timestamp){
-            new_timestamp = key_value_pair.second.first.first;
         }
         if(key < min_key) min_key = key;
         if(key > max_key) max_key = key;
         num++;
         memory_size += 12 + value.size();
-        new_bloomfilter->insert(key);
         kvs.emplace_back(make_pair(key, value));
     }
     if(num > 0){
-        write(level, num, min_key, max_key, new_timestamp, new_bloomfilter, kvs);
+        write(level, num, min_key, max_key, new_time_stamp, memory_size, kvs);
+        TAG++;
     }
 }
 
@@ -403,7 +438,8 @@ void KVStore::compaction(uint64_t level_x, uint64_t level_y) {
         level_mode[level_y] = make_pair(limits_number, Leveling);
     }
     //check if level_x file nums is greater than limits
-    if(sstable[level_x].size() <= level_mode[level_x].first) return;
+    uint64_t limits = level_mode[level_x].first;
+    if(sstable[level_x].size() <= limits) return;
 
     //i select sstable
     vector<pair<uint64_t, uint64_t>> x_select_files, y_select_files;  //time_stamp, tag
@@ -429,40 +465,41 @@ void KVStore::compaction(uint64_t level_x, uint64_t level_y) {
 
     //2 read key_value;
     map<uint64_t, pair<pair<uint64_t, uint64_t>, string>> key_value;  //key, <time_stamp&tag, value>
+    set<uint64_t> keys;
     for(auto time_tag_files : temp_sstable[level_x]){
-//        for(auto tag_files : time_files.second){
             sstable_cache* cur_sstable = time_tag_files.second;
             //read key value pairs
             read_key_value_from_disk(level_x, const_cast<uint64_t &>(time_tag_files.first.first),
-                                     const_cast<uint64_t &>(time_tag_files.first.second), cur_sstable, key_value);
+                                     const_cast<uint64_t &>(time_tag_files.first.second), cur_sstable, key_value, keys);
     }
     for(auto time_tag_files : temp_sstable[level_y]){
-//        for(auto tag_files : time_files.second){
             sstable_cache* cur_sstable = time_tag_files.second;
             if(cur_sstable == nullptr) continue;
             //read key value pairs
             read_key_value_from_disk(level_y, const_cast<uint64_t &>(time_tag_files.first.first),
-                                     const_cast<uint64_t &>(time_tag_files.first.second), cur_sstable, key_value);
+                                     const_cast<uint64_t &>(time_tag_files.first.second), cur_sstable, key_value, keys);
     }
 
     //3 delete old files
+//    std::cout << "deleted files: ";
     for(const auto& time_tag_files : temp_sstable[level_x]){
-//        for(auto tag_files : time_files.second){
-            sstable_cache* cur_sstable = time_tag_files.second;
             //delete file
             string file_path = dir_name + "/level-" + to_string(level_x) + "/" + to_string(time_tag_files.first.first) + "_" + to_string(time_tag_files.first.second) + ".sst";
             utils::rmfile(file_path.c_str());
             sstable[level_x].erase(make_pair(time_tag_files.first.first, time_tag_files.first.second));
-//            if(sstable[level_x][time_files.first].empty()){
-//                sstable[level_x].erase(time_files.first);
-//            }
+    }
+    for(const auto& time_tag_files : temp_sstable[level_y]){
+        //delete file
+        string file_path = dir_name + "/level-" + to_string(level_y) + "/" + to_string(time_tag_files.first.first) + "_" + to_string(time_tag_files.first.second) + ".sst";
+        utils::rmfile(file_path.c_str());
+        sstable[level_y].erase(make_pair(time_tag_files.first.first, time_tag_files.first.second));
     }
 
     //4 write merged sstable to disk
+
     string level_y_path = dir_name + "/level-" + to_string(level_y);
     if(!utils::dirExists(level_y_path)) utils::mkdir(level_y_path.c_str());
-    compaction_write(key_value, level_y);
-
+    compaction_write(key_value, level_y, new_time_stamp);
 
     //iii recursive compaction
     compaction(level_y, level_y + 1);

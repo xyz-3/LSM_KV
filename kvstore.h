@@ -16,15 +16,15 @@
 
 class cmp{
 public:
-    bool operator()(sstable_cache* sa, sstable_cache* sb){
+    bool operator()(sstable_cache* sa, sstable_cache* sb){  //big heap
         if(sa->get_timestamp() == sb->get_timestamp()){
             if(sa->get_min_key() == sb->get_min_key()){
-                return sa->get_max_key() > sb->get_max_key();
+                return sa->get_max_key() < sb->get_max_key();
             }else{
-                return sa->get_min_key() > sb->get_min_key();
+                return sa->get_min_key() < sb->get_min_key();
             }
         }else {
-            return sa->get_timestamp() > sb->get_timestamp();
+            return sa->get_timestamp() < sb->get_timestamp();
         }
     }
 };
@@ -49,7 +49,7 @@ private:
         Tiering,
         Leveling
     };
-    map<uint64_t, pair<uint64_t, mode>> level_mode;
+    map<uint64_t, pair<uint64_t, mode>> level_mode; //level, <limits_number,mode>
     void read_mode();
 
     void read_data_from_disk();
@@ -65,16 +65,17 @@ private:
 
     void read_key_value_from_disk(uint64_t& level, uint64_t& time_stamp, uint64_t& tag,
                                   sstable_cache* cur_sstable,
-                                  map<uint64_t, pair<pair<uint64_t, uint64_t>, string>>& key_value);
+                                  map<uint64_t, pair<pair<uint64_t, uint64_t>, string>>& key_value,
+                                  set<uint64_t>& keys);
 
-    void compaction_write(map<uint64_t, pair<pair<uint64_t, uint64_t>, string>>& key_value, uint64_t& level);
+    void compaction_write(map<uint64_t, pair<pair<uint64_t, uint64_t>, string>>& key_value, uint64_t& level, uint64_t& new_time_stamp);
 
     void write(uint64_t& level,
                uint64_t& num,
                uint64_t& min_key,
                uint64_t& max_key,
                uint64_t& t_s,
-               bloomfilter*& blm,
+               uint64_t& size,
                vector<pair<uint64_t, string>>& kvs);
 
 public:
