@@ -16,7 +16,11 @@ public:
                                          const std::string& dir_path,
                                          uint64_t time_stamp,
                                          uint64_t tag);
-    static string read_disk(index_item* index_i, const std::string& dir_path, const uint64_t& time_stamp, const uint64_t& tag, uint32_t& value_size);
+    static string read_disk(index_item* index_i,
+                            const std::string& dir_path,
+                            const uint64_t& time_stamp,
+                            const uint64_t& tag,
+                            uint32_t& value_size);
     static sstable_cache* read_sstable(const std::string& file_path);
 
 };

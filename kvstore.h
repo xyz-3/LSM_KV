@@ -49,13 +49,15 @@ private:
         Tiering,
         Leveling
     };
-    map<uint64_t, pair<uint64_t, mode>> level_mode; //level, <limits_number,mode>
+    map<uint64_t, pair<uint64_t, mode>> level_mode; //level, <limits_number, mode>
     void read_mode();
 
     void read_data_from_disk();
 
     static void get_level_timeStamp_tag(uint64_t& level, uint64_t& time_stamp, uint64_t& tag, const string& file_name);
 
+
+    /* Compaction functions */
     void compaction(uint64_t level_x, uint64_t level_y);
 
     void select_file(vector<pair<uint64_t, uint64_t>>& x_select_files,
@@ -68,7 +70,9 @@ private:
                                   map<uint64_t, pair<pair<uint64_t, uint64_t>, string>>& key_value,
                                   set<uint64_t>& keys);
 
-    void compaction_write(map<uint64_t, pair<pair<uint64_t, uint64_t>, string>>& key_value, uint64_t& level, uint64_t& new_time_stamp);
+    void compaction_write(map<uint64_t, pair<pair<uint64_t, uint64_t>, string>>& key_value,
+                          uint64_t& level,
+                          uint64_t& new_time_stamp);
 
     void write(uint64_t& level,
                uint64_t& num,
@@ -90,7 +94,5 @@ public:
     bool del(uint64_t key) override;
 
     void reset() override;
-
-    void scan(uint64_t key1, uint64_t key2, std::list<std::pair<uint64_t, std::string> > &list) override;
 };
 

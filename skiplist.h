@@ -60,12 +60,11 @@ public:
 
     void put(uint64_t key, const string &s);
     string get(uint64_t key) const;
-    bool del(uint64_t key);
     uint64_t get_size() const;
     uint64_t get_length() const;
     uint64_t get_min_key() const;
     uint64_t get_max_key() const;
-    void store_bloomfilter(sstable_cache*& ssc);
+    void store_bloomfilter(sstable_cache*& ssc) const;
     ~skiplist();
 };
 

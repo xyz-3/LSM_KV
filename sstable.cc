@@ -20,7 +20,7 @@ bool sstable_cache::is_in_range(uint64_t &key) const {
 }
 
 index_item* sstable_cache::find_key_in_indexs(const uint64_t key, uint32_t& value_size){
-    //binary search
+    //binary search to find the key
     int left = 0, right = Indexs.size() - 1;
     while(left <= right){
         int mid = (left + right) / 2;

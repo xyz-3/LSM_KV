@@ -38,12 +38,5 @@ public:
 	 * including memtable and all sstables files.
 	 */
 	virtual void reset() = 0;
-
-	/**
-	 * Return a list including all the key-value pair between key1 and key2.
-	 * keys in the list should be in an ascending order.
-	 * An empty string indicates not found.
-	 */
-	virtual void scan(uint64_t key1, uint64_t key2, std::list<std::pair<uint64_t, std::string> > &list) = 0;
 };
 
